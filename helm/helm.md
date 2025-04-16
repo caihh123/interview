@@ -1,3 +1,5 @@
+
+
 # helm介绍、组件、安装和目录结构
 
 ## 传统服务部署到k8s集群的流程
@@ -443,6 +445,430 @@ helm history nginx-release
 ```
 
 # helm内置函数详解
+
+## 内置函数
+
+###  常用函数
+
+- quote和sqlute
+- upper和lower 
+- repeat 
+- default
+- lookup
+
+### 函数使用
+
+```shell
+格式1: 函数名 arg1 arg2 ...
+格式2: arg1 | 函数名
+```
+
+ ### 案例
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  values1: {{ quote .Values.name }}               # 加双引号
+  values2: {{ squote .Values.name }}              # 加单引号
+  values3: {{ .Values.name | quote }}             # 加双引号
+  values4: {{ .Values.name | squote }}            # 加单引号
+  values5: {{ .Values.name | upper | quote }}     # 将字母大写
+  values6: {{ .Values.name | lower | squote }}    # 将字母小写
+  values7: {{ .Values.name | repeat 2 }}          # 重复输出两次
+  values8: {{ .Values.test | default "haha" }}    # 默认值
+
+```
+
+lookup 
+
+使用lookup函数用于在当前的k8s集群中获取一些资源的信息，功能有些类似于kubectl get，函数的格式如下:
+
+```shell
+lookup "apiversion" "kind" "namespace""name"
+```
+
+其中namespace和name都是可选的，或可以指定为空字符串， 函数执行完成后会返回特定的资源常用格式和kubect命令相互对应关系:
+
+| kubectl命令                          | lookup 函数                              |
+| ------------------------------------ | ---------------------------------------- |
+| kubectl get pod mypod -n mynamespace | lookup "v1" "Pod" "mynamespace" "mypod"  |
+| kubectl get pods -n mynamespace      | lookup "v1" "Pod" "'mynamespace" ""      |
+| kubectl get pods --all-namespaces    | lookup "v1" "Pod" "" ""                  |
+| Kubectl get namespace mynamespace    | lookup "v1" "Namespace" "" "mynamespace" |
+| kubectl get namespaces               | lookup "v1" "Namespace" "" ""            |
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  values1: {{ lookup "v1" "Namespace" "" "" | quote }}
+```
+
+```shell
+helm get manifest myconfigmap
+---
+# Source: mychart/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  values1: "map[apiVersion:v1 items:[map[apiVersion:v1 kind:Namespace metadata:map[creationTimestamp:2025-04-15T03:12:48Z labels:map[kubernetes.io/metadata.name:default] managedFields:[map[apiVersion:v1 fieldsType:FieldsV1 fieldsV1:map[f:metadata:map[f:labels:map[.:map[] f:kubernetes.io/metadata.name:map[]]]] manager:kube-apiserver operation:Update time:2025-04-15T03:12:48Z]] name:default resourceVersion:193 uid:a7fca939-a5ca-4575-ba78-6cb687cb7bb2] spec:map[finalizers:[kubernetes]] status:map[phase:Active]] map[apiVersion:v1 kind:Namespace metadata:map[creationTimestamp:2025-04-15T03:12:47Z labels:map[kubernetes.io/metadata.name:kube-node-lease] managedFields:[map[apiVersion:v1 fieldsType:FieldsV1 fieldsV1:map[f:metadata:map[f:labels:map[.:map[] f:kubernetes.io/metadata.name:map[]]]] manager:kube-apiserver operation:Update time:2025-04-15T03:12:47Z]] name:kube-node-lease resourceVersion:6 uid:1bf92c1a-0a4d-449e-8865-33f9254673d2] spec:map[finalizers:[kubernetes]] status:map[phase:Active]] map[apiVersion:v1 kind:Namespace metadata:map[creationTimestamp:2025-04-15T03:12:47Z labels:map[kubernetes.io/metadata.name:kube-public] managedFields:[map[apiVersion:v1 fieldsType:FieldsV1 fieldsV1:map[f:metadata:map[f:labels:map[.:map[] f:kubernetes.io/metadata.name:map[]]]] manager:kube-apiserver operation:Update time:2025-04-15T03:12:47Z]] name:kube-public resourceVersion:5 uid:6c02e29c-ef13-43bb-a271-0a9797bc85a3] spec:map[finalizers:[kubernetes]] status:map[phase:Active]] map[apiVersion:v1 kind:Namespace metadata:map[creationTimestamp:2025-04-15T03:12:47Z labels:map[kubernetes.io/metadata.name:kube-system] managedFields:[map[apiVersion:v1 fieldsType:FieldsV1 fieldsV1:map[f:metadata:map[f:labels:map[.:map[] f:kubernetes.io/metadata.name:map[]]]] manager:kube-apiserver operation:Update time:2025-04-15T03:12:47Z]] name:kube-system resourceVersion:3 uid:88c285fc-de38-4533-8f4b-0dba029b03ce] spec:map[finalizers:[kubernetes]] status:map[phase:Active]]] kind:NamespaceList metadata:map[resourceVersion:43280]]"
+```
+
+## 逻辑和流控制函数
+
+| 函数名  | 含义                                                         |
+| ------- | ------------------------------------------------------------ |
+| eq      | 用于判断两个参数是否相等，如果等于则为true，不等于则为false  |
+| ne      | 用于判断两个参数是否不相等，如果不等于则为true，等于则为false |
+| lt      | 判断第一个参数是否小于第二个参数，如果小于则为true，如果大于则为false |
+| le      | 判断第一个参数是否小于等于第二个参数，如果成立则为true，如果不成立则为false |
+| gt      | 判断第一个参数是否大于第二个参数，如果大于则为tue，如果小于则为false |
+| ge      | 判断第一个参数是否大于等于第二个参数，如果成立则为true，如果不成立则为 false |
+| and     | 返回两个参数的逻辑与结果(布尔值)，也就是说如果两个参数为真，则结果为tue，否认哪怕一个为假，则返回false |
+| or      | 判断两个参数的逻辑或的关系，两个参数中有一个为真，则为真     |
+| not     | 用于对参数的布尔值取反                                       |
+| default | 用来设置一个默认值，在参数的值为空的情况下，则会使用默认值   |
+| empty   | 用于判断给定值是否为空，如果为空则返回true                   |
+| coalese | 用于扫描一个给定的列表，并返回第一个非空的值                 |
+| ternary | 接受两个参数和一个test值，如果test 的布尔值为true，则返回第一个参数的值，否则返回第二个参数的值 |
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  values1: {{ eq 2 2}}
+  values2: {{ ne 2 2}}
+  values3: {{ lt 2 2}}
+  values4: {{ le 2 2}}
+  values5: {{ gt 2 2}}
+  values6: {{ ge 2 2}}
+  values7: {{ and 0 0}}
+  values8: {{ or 0 1}}
+  values9: {{ not 1 | quote}}
+  values10: {{ .Values.test | empty }}
+  values11: {{ .Values.test | default "haha" }}
+  values12: {{ coalesce 0 1 2 }}
+  values13: {{ coalesce "" "hello" "world" }}
+  values14: {{ ternary "hello" "world" true }}
+  values15: {{ ternary "hello" "world" false }}
+```
+
+## 字符串函数
+
+1.常用helm3的字符串函数
+(1).
+(2).
+(3).(4)(5)
+
+|                                                 |                                                              |
+| ----------------------------------------------- | ------------------------------------------------------------ |
+| print，println                                  | 打印，println会在两个非字符串之间加空格，行尾家换行          |
+| printf                                          | 按格式打印                                                   |
+| trim，trimAll，trimPrefix，trimSufix            | 用来对字符串进行修剪，trimAll去除首尾的                      |
+| lower，upper，title，untitle                    | 大小写，首字母处理                                           |
+| snakecase，camelcase，kebabcase                 | 驼峰，下划线，中横线转换                                     |
+| swapcase                                        | 大写表小写，首字母小写，空格或开头小写转大写，其他小写转大写 |
+| substr                                          | 字符串切割                                                   |
+| trunc                                           | 截断字符串，正数从左向右，负数从右向左                       |
+| abbrev                                          | 保留前n-3个字符，最后三个是...，不满足不变，不够填充...不变  |
+| randAlphaNum，randAlpha，randNumeric，randAscii | 生成加密随机字符串                                           |
+| contains                                        | 是否有子串                                                   |
+| hasPrefix和hasSuffix                            | 前缀后缀判断                                                 |
+| repeat                                          | 重复输出指定次数                                             |
+| nospace                                         | 去掉空格                                                     |
+| initials                                        | 截取字符串首字母                                             |
+| wrapWith                                        | 在指定列添加内容                                             |
+| quote和squote                                   | 添加双引号单引号                                             |
+| cat                                             | 将多个字符串合成一个，用空格分开                             |
+| replace                                         | 替换字符串                                                   |
+| shuffle                                         | 将字符串顺序打乱                                             |
+| indent和nindent                                 | 指定长度缩进指定字符串的所在行，nindent可以在字符串开头添加新行 |
+| plural                                          |                                                              |
+
+```yaml 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace }}
+data:
+  values1: {{ print 2 3 "hello" "haha" }}
+  values2: {{ println 2 3 "hello" "haha" }}
+  values3: {{ printf "hello %s!" "world"}}
+  values4: {{ printf "hello %d" 10 }}
+  values5: {{ printf "hello %.2f" 10.12312 }}
+  values6: {{ trim "   hello world! " }}
+  values7: {{ trimAll "%" "%hello%world!" }}
+  values8: {{ trimPrefix "-" "-hello" }}
+  values9: {{ trimSuffix "-" "hello-" }}
+  values10: {{ lower "HELLO" }}
+  values11: {{ upper "hello" }}
+  values12: {{ title "hELLO" }}
+  values13: {{ untitle "HELLO" }}
+  values14: {{ snakecase "UserName" }}
+  values15: {{ camelcase "user_name" }}
+  values16: {{ kebabcase "UserName" }}
+  values17: {{ swapcase "This is A.Test" }}
+  values18: {{ substr 2 4 "agjfkal" }}
+  values19: {{ trunc 5 "Hello World" }}
+  values20: {{ trunc -5 "Hello World" }}
+  values21: {{ abbrev 5 "Hello World" }}
+  values22: {{ randAlphaNum 10 }}
+  values23: {{ randAlpha 10 }}
+  values24: {{ randNumeric 10 }}
+  values25: {{ randAscii 10 }}
+  values26: {{ contains "llo" "Hello" }}
+  values27: {{ hasPrefix "He" "Hello" }}
+  values28: {{ hasSuffix "lo" "Hello" }}
+  values29: {{ repeat 3 "11"}}
+  values30: {{ nospace " H  e l l o " }}
+  values31: {{ initials "Are You Ok" }}
+  values32: {{ wrapWith 5 " " "HelloWorld" }}
+  values33: {{ hello | quote }}
+  values34: {{ hello | squote }}
+  values35: {{ cat "Hello" "World" }}
+  values36: {{ "Hello%World" | replace "%" " " }}
+  values37: {{ shuffle "abcdefghijklmn" }}
+  values38: {{ indent 4 "this is indent" }}
+  values39: {{ nindent 4 "this is nindent" }}
+  values40: {{ len "a" | plural "one" "many" }}
+  values41: {{ len "abc" | plural "one" "many" }}
+  values42: {{ len "" | plural "one" "many" }}
+```
+
+## 类型转换和正则表达式函数
+
+### 类型转换函数
+
+| 函数         | 含义                                                     |
+| ------------ | -------------------------------------------------------- |
+| atoi         | 将字符串转换为整数                                       |
+| foat64       | 转换成foat64                                             |
+| int          | 转换为int类型                                            |
+| toString     | 转换成字符串                                             |
+| int64        | 转换成int64                                              |
+| toDecimal    | 将unix八进制转换成 int64                                 |
+| toStrings    | 将列表、切片或数组转换成字符串                           |
+| toJson       | 将列表、切片、数组、字典或对象转换成JSON                 |
+| toPrettyJson | 将列表、切片、数组、字典或对象转换成格式化JSON           |
+| toRawJson    | 将列表、切片、数组、字典或对象转换成ISON(HTML字符不转义) |
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  values1: {{ 16 | kindOf }}
+  values2: {{ "16" | kindOf }}
+  values3: {{ atoi "16" }}
+  values4: {{ float64 "16.1" }}
+  values5: {{ int "16" }}
+  values6: {{ toString "16" }}
+```
+
+### 正则表达式函数
+
+| 函数                                               | 含义                                                 |
+| -------------------------------------------------- | ---------------------------------------------------- |
+| regexFind和mustRegexFind                           | 获取字符串中正则匹配的第一个结果                     |
+| regexFindAll和mustRegexFindAll                     | 获取字符串中正则匹配的子串内容，-1表示所有           |
+| regexMatch和mustRegexMatch                         | 根据正则表达式匹配                                   |
+| regexReplaceAll和mustRegexReplaceAll               | 指定替换字符替换正则表达式匹配的内容                 |
+| regexReplaceAllLiteral和mustRegexReplaceAllLiteral | 将正则表达式匹配的内容替换成爱他内容                 |
+| regexSplit和mustRegexSplit                         | 指定分隔符(以正则匹配的内容为分隔符)对字符串进行切割 |
+
+在Helm的模板引擎中，`regexReplaceAll`和`regexReplaceAllLiteral`均用于正则表达式替换，但它们在处理替换字符串时存在关键区别：
+
+### 1. `regexReplaceAll`
+- **功能**：执行正则替换，并**解析替换字符串中的特殊语法**（如反向引用`$1`、`$name`等）。
+- **行为**：
+  - 替换字符串中的`$1`、`$2`等会被视为正则表达式的捕获组引用。
+  - 支持正则替换的高级语法（如`${group}`）。
+- **示例**：
+  ```gotemplate
+  {{ regexReplaceAll "(foo)(bar)" "foobar" "${1}-${2}" }} 
+  # 输出：foo-bar
+  ```
+
+### 2. `regexReplaceAllLiteral`
+- **功能**：执行正则替换，但**替换字符串中的所有字符均按字面量处理**。
+- **行为**：
+  - 替换字符串中的`$1`、`\n`等特殊字符不会被解析，直接作为普通文本插入。
+  - 适用于需要保留`$`、`\`等字符的场景。
+- **示例**：
+  ```gotemplate
+  {{ regexReplaceAllLiteral "(foo)" "foo" "$$1" }} 
+  # 输出：$1（而不是捕获组的内容）
+  ```
+
+### 关键区别总结
+| 函数                     | 处理替换字符串的方式         | 适用场景                           |
+| ------------------------ | ---------------------------- | ---------------------------------- |
+| `regexReplaceAll`        | 解析反向引用和特殊语法       | 需要动态引用捕获组内容时（如`$1`） |
+| `regexReplaceAllLiteral` | 完全按字面量替换，不解析语法 | 需保留`$`、`\`等字符时             |
+
+### 示例场景
+- **使用`regexReplaceAll`**：
+  ```gotemplate
+  # 输入：Hello 123 World
+  {{ regexReplaceAll "([A-Za-z]+) (\d+)" "Hello 123 World" "${2}_${1}" }}
+  # 输出：123_Hello World
+  ```
+
+- **使用`regexReplaceAllLiteral`**：
+  ```gotemplate
+  # 输入：Hello 123 World
+  {{ regexReplaceAllLiteral "(\d+)" "Hello 123 World" "$$1" }}
+  # 输出：Hello $1 World
+  ```
+
+根据是否需要处理替换字符串中的正则语法，选择合适的函数以避免意外结果。
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  data1: {{ regexFind "[a-zA-z][1-9]" "abcd1234c1" | quote }}
+  data2: {{ mustRegexFind "[a-zA-z][1-9]" "abcd1234c1" | quote }}
+  data3: {{ regexFindAll "[2,4,6,8]" "123456789" 3 | quote }}
+  data4: {{ regexFindAll "[2,4,6,8]" "123456789" -1 | quote }}
+  data5: {{ mustRegexFindAll "[2,4,6,8]" "123456789" 3 | quote }}
+  data6: {{ mustRegexFindAll "[2,4,6,8]" "123456789" -1 | quote }}
+  data7: {{ regexMatch "^[A-Za-z0-9.%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$" "test@xxx.com" | quote }}
+  data8: {{ mustRegexMatch "^[A-Za-z0-9.%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$" "test@xxx.com" | quote }}
+  data9: {{ regexReplaceAll "ab" "-ab-ab-axxb-" "W" | quote }}
+  data10: {{ regexReplaceAll "a(x*)b" "-ab-axxb-" "W" | quote }}
+  data11: {{ regexReplaceAll "a(x*)b" "-axb-axxb-" "W" | quote }}
+  data12: {{ regexReplaceAll "a(x*)b" "-ab-axxb-" "${1}W" | quote }}
+  data13: {{ mustRegexReplaceAll "ab" "-ab-ab-axxb-" "W" | quote }}
+  data14: {{ mustRegexReplaceAll "a(x*)b" "-ab-axxb-" "W" | quote }}
+  data15: {{ mustRegexReplaceAll "a(x*)b" "-axb-axxb-" "W" | quote }}
+  data16: {{ mustRegexReplaceAll "a(x*)b" "-ab-axxb-" "${1}W" | quote }}
+  data17: {{ regexReplaceAllLiteral "ab" "-ab-ab-axxb-" "W" | quote }}
+  data18: {{ regexReplaceAllLiteral "a(x*)b" "-ab-axxb-" "W" | quote }}
+  data19: {{ regexReplaceAllLiteral "a(x*)b" "-axb-axxb-" "W" | quote }}
+  data20: {{ regexReplaceAllLiteral "a(x*)b" "-ab-axxb-" "${1}W" | quote }}
+  data21: {{ mustRegexReplaceAllLiteral "ab" "-ab-ab-axxb-" "W" | quote }}
+  data22: {{ mustRegexReplaceAllLiteral "a(x*)b" "-ab-axxb-" "W" | quote }}
+  data23: {{ mustRegexReplaceAllLiteral "a(x*)b" "-axb-axxb-" "W" | quote }}
+  data24: {{ mustRegexReplaceAllLiteral "a(x*)b" "-ab-axxb-" "${1}W" | quote }}
+  data25: {{ regexSplit "z+" "pizza" -1 | quote }}
+  data26: {{ mustRegexSplit "z+" "pizza" -1 | quote }}
+```
+
+## 加密函数和编解码函数
+
+- 
+  sha1sum
+- sha256sum
+- adler32sum
+- htpasswd
+- encryptAES
+- decryptAES
+
+helm有以下编码和解码函数:
+
+b64enc编码函数和b64dec解码函数:编码或解码 Base64
+
+b32enc编码函数和b32dec解码函数:编码或解码 Base32
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  data1: {{ sha1sum "Hello World" | quote }}
+  data2: {{ sha256sum "Hello World" | quote }}
+  data3: {{ adler32sum "Hello World" | quote }}
+  data4: {{ htpasswd "user" "1234456" | quote }}
+  data5: {{ "test" | b64enc | quote }}
+  data6: {{ "dGVzdA==" | b64dec | quote }}
+```
+
+## 日期函数
+
+- now
+- date
+- dateInZone
+- duration和durationRound
+- unixEpoch
+- dateModify和mustDateModify
+- toDate和mustToDate
+
+| 函数                        | 含义                                                         |
+| --------------------------- | ------------------------------------------------------------ |
+| now                         | 用于返回当前日期和时间，通常与其他日期函数共同使用           |
+| date                        | 用于将日期信息进行格式化，需指明日期的格式，格式必须使用"2006-01-02"或 "02/01/2006"来标明，否则会出错 |
+| dateInZone                  | 用法与date函数基本一致，只不过dataInZone函数可以指定时区返回时间，如:指定UTC时区返回时间示 |
+| duration                    | 将给定的秒数转换为Duration类型，例如指定 95秒可以返回1m35s，秒数必须需要使用双引号，否则会返回0s |
+| durationRound               | 将给定的日期进行取整，保留最大的单位                         |
+| unixEpoch                   | 返回给定时间的时间戳                                         |
+| dateModify和must DateModify | 修改时间                                                     |
+| toDate和mustToDate          | 将字符串转换成时间                                           |
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  data1: {{ now | quote }}
+  data2: {{ now | date "2006-01-02" | quote }}
+  data3: {{ dateInZone "2006-01-02" (now) "UTC" | quote }}
+  data4: {{ duration "95" | quote }}
+  data5: {{ durationRound "2h10m5s" | quote }}
+  data6: {{ now | unixEpoch | quote }}
+  data7: {{ now | dateModify "-2h" | quote }}
+  data8: {{ toDate "2006-01-02" "2025-04-16" | quote }}
+  data9: {{ mustToDate "2006-01-02" "2025-04-16" | quote }}
+```
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "2025-04-16 17:06:17.322558 +0800 CST m=+0.155979918"
+  data2: "2025-04-16"
+  data3: "2025-04-16"
+  data4: "1m35s"
+  data5: "2h"
+  data6: "1744794377"
+  data7: "2025-04-16 15:06:17.322581 +0800 CST m=-7199.843996916"
+  data8: "2025-04-16 00:00:00 +0800 CST"
+  data9: "2025-04-16 00:00:00 +0800 CST"
+```
+
+## 字典函数
+
+## 列表函数
+
+## 数学计算函数
+
+## 网络，文件路径，类型检查函数
 
 # 流程控制语句
 
