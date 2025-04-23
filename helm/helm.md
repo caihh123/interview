@@ -864,23 +864,741 @@ data:
 
 ## 字典函数
 
+### dict
+
+| 函数  | 含义             |
+| ----- | ---------------- |
+| get   | 获取value通过key |
+| set   | 设置key，value   |
+| unset | 删除key          |
+
+示例
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{ $myDict := dict "1" "haha" "2" "hello"}}
+  data1: {{ $myDict | quote }}
+  data2: {{ get $myDict "1" | quote }}
+  data3: {{ set $myDict "1" "test" | quote }}
+  data4: {{ get $myDict "1" | quote }}
+  data5: {{ unset $myDict "1" | quote }}
+```
+
+结果
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+
+  data1: "map[1:haha 2:hello]"
+  data2: "haha"
+  data3: "map[1:test 2:hello]"
+  data4: "test"
+  data5: "map[2:hello]"
+```
+
+### keys 遍历
+
+示例
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{ $myDict1 := dict "1" "haha" "2" "hello"}}
+  {{ $myDict2 := dict "2" "zhangwuji" "3" "zhaoming"}}
+  {{ $myDict3 := dict "4" "mary" "5" "mark"}}
+  data1: {{ keys $myDict1 $myDict2 $myDict3 | quote }}
+  data2: {{ keys $myDict1 $myDict2 $myDict3 | sortAlpha | uniq | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "[1 2 2 3 4 5]"
+  data2: "[1 2 3 4 5]"
+```
+
+### hasKey
+
+示例
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{ $myDict := dict "1" "haha" "2" "hello"}}
+  data1: {{ hasKey $myDict "1" | quote }}
+  data2: {{ hasKey $myDict "3" | quote }}
+```
+
+结果
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "true"
+  data2: "false"
+```
+
+### pluck
+
+根据一个key获取多个dict的values
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{ $myDict1 := dict "1" "haha" "2" "hello"}}
+  {{ $myDict2 := dict "2" "zhangwuji" "3" "zhaoming"}}
+  data1: {{ pluck "1" $myDict1 $myDict2 | quote }}
+  data2: {{ pluck "2" $myDict1 $myDict2 | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "[haha]"
+  data2: "[hello zhangwuji]"
+```
+
+### merge 
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{ $myDict1 := dict "1" "haha" "2" "hello"}}
+  {{ $myDict2 := dict "2" "zhangwuji" "3" "zhaoming"}}
+  data1: {{ merge $myDict1 $myDict2 | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "map[1:haha 2:hello 3:zhaoming]"
+```
+
+### mergeOverwrite
+
+重复key会覆盖
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{ $myDict1 := dict "1" "haha" "2" "hello"}}
+  {{ $myDict2 := dict "2" "zhangwuji" "3" "zhaoming"}}
+  data1: {{ mergeOverwrite $myDict1 $myDict2 | quote }}
+  data2: {{ mustMergeOverwrite $myDict1 $myDict2 | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "map[1:haha 2:zhangwuji 3:zhaoming]"
+  data2: "map[1:haha 2:zhangwuji 3:zhaoming]"
+```
+
+### values
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{ $myDict1 := dict "1" "haha" "2" "hello"}}
+  data1: {{ values $myDict1 | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "[haha hello]"
+```
+
+### pick和omit
+
+pick获取指定的key返回dict，omit返回没有被指定的
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{ $myDict1 := dict "1" "haha" "2" "hello" "3" "hehe"}}
+  data1: {{ pick $myDict1 "1" "2" | quote }}
+  data2: {{ omit $myDict1 "1" "2" | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+
+  data1: "map[1:haha 2:hello]"
+  data2: "map[3:hehe]"
+```
+
+### deepCopy和mustDeepCopy
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{ $myDict1 := dict "1" "haha" "2" "hello" "3" "hehe"}}
+  data1: {{ deepCopy $myDict1 | quote }}
+  data2: {{ mustDeepCopy $myDict1 | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "map[1:haha 2:hello 3:hehe]"
+  data2: "map[1:haha 2:hello 3:hehe]"
+```
+
 ## 列表函数
+
+### list，first，rest，last，initial
+
+| list    | 生成一个列表                 |
+| ------- | ---------------------------- |
+| first   | 获取列表第一个               |
+| rest    | 获取列表第一个以外的其他的   |
+| last    | 获取列表最后一项             |
+| initial | 获取列表最后一项以外的其他的 |
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{ $myList := list 1 2 3 "haha" "hello" "hehe"}}
+  data1: {{ $myList | quote }}
+  data2: {{ first $myList | quote }}
+  data3: {{ rest $myList | quote }}
+  data4: {{ last $myList | quote }}
+  data5: {{ initial $myList | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "[1 2 3 haha hello hehe]"
+  data2: "1"
+  data3: "[2 3 haha hello hehe]"
+  data4: "hehe"
+  data5: "[1 2 3 haha hello]"
+```
+
+### append，prepend，concat，reverse，uniq
+
+| append  | 向后追加   |
+| ------- | ---------- |
+| prepend | 向前追加   |
+| concat  | 合并列表   |
+| reverse | 反转列表   |
+| uniq    | 去除重复项 |
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{ $myList := list 1 2 3 "haha" "hello" "hehe"}}
+  data1: {{ append $myList "test" | quote }}
+  data2: {{ prepend $myList "test" | quote }}
+  data3: {{ concat $myList (list 4 5 6) (list "zhangwuji" "zhaomin" "xiaozhao") | quote }}
+  data4: {{ reverse $myList | quote }}
+  data5: {{ $myList | uniq  | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "[1 2 3 haha hello hehe test]"
+  data2: "[test 1 2 3 haha hello hehe]"
+  data3: "[1 2 3 haha hello hehe 4 5 6 zhangwuji zhaomin xiaozhao]"
+  data4: "[hehe hello haha 3 2 1]"
+  data5: "[1 2 3 haha hello hehe]"
+```
+
+### without，has，compact
+
+| 函数    | 含义       |
+| ------- | ---------- |
+| without | 过滤指定列 |
+| has     | 是否包含   |
+| compact | 删除空值   |
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  data1: {{ without (list 1 2 3 4) 1 | quote }}
+  data2: {{ without (list 1 2 3 4) 1 2 | quote }}
+  data3: {{ without (list 1 2 3 4) 5 | quote }}
+  data4: {{ has "test" (list 1 2 3 4) | quote }}
+  data5: {{ has 2 (list 1 2 3 4) | quote }}
+  data6: {{ compact (list "haha" "hello" "") | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "[2 3 4]"
+  data2: "[3 4]"
+  data3: "[1 2 3 4]"
+  data4: "false"
+  data5: "true"
+  data6: "[haha hello]"
+```
+
+### slice，until，untilStep，seq
+
+| 函数      | 含义                       |
+| --------- | -------------------------- |
+| slice     | 对列表进行切割             |
+| until     | 构建一个指定整数范围的列表 |
+| untilStep | 可以定义整数的开始和步长   |
+| seq       | 生成指定范围的整数         |
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{ $myList := list 1 2 3 4 5 }}
+  data1: {{ slice $myList | quote }}
+  data2: {{ slice $myList 3 | quote }}
+  data3: {{ slice $myList 1 3 | quote }}
+  data4: {{ slice $myList 0 3 | quote }}
+  data5: {{ until 5 | quote }}
+  data6: {{ untilStep 3 9 2 | quote }}
+  data7: {{ seq 5 | quote }}
+  data8: {{ seq 0 2 | quote }}
+  data9: {{ seq 0 2 10 | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "[1 2 3 4 5]"
+  data2: "[4 5]"
+  data3: "[2 3]"
+  data4: "[1 2 3]"
+  data5: "[0 1 2 3 4]"
+  data6: "[3 5 7]"
+  data7: "1 2 3 4 5"
+  data8: "0 1 2"
+  data9: "0 2 4 6 8 10"
+```
 
 ## 数学计算函数
 
+### add，sub，mul，div，mod，add1
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  data1: {{ add 1 2 | quote }}
+  data2: {{ sub 3 2 | quote }}
+  data3: {{ mul 2 3 | quote }}
+  data4: {{ div 9 3 | quote }}
+  data5: {{ mod 9 2 | quote }}
+  data6: {{ add1 2 | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "3"
+  data2: "1"
+  data3: "6"
+  data4: "3"
+  data5: "1"
+  data6: "3"
+```
+
+### max，min，round，len，floor，ceil
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  data1: {{ max 1 2 3 3 | quote }}
+  data2: {{ min 1 2 3 1 | quote }}
+  data3: {{ round 3.141926 3 | quote }}
+  data4: {{ len "123123" | quote }}
+  data5: {{ floor 3.12312 | quote }}
+  data6: {{ ceil 3.12312 | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "3"
+  data2: "1"
+  data3: "3.142"
+  data4: "6"
+  data5: "3"
+  data6: "4"
+```
+
 ## 网络，文件路径，类型检查函数
+
+### getHostByName
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  data1: {{ getHostByName "www.baidu.com" | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "110.4242.68.3"
+```
+
+### base，dir，ext，isAbs
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  data1: {{ base "/tmp/a/a.txt" | quote }}
+  data2: {{ dir "/tmp/a/a.txt" | quote }}
+  data3: {{ ext "a.txt" | quote }}
+  data4: {{ isAbs "/tmp/a" | quote }}
+  data5: {{ isAbs "tmp/a" | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "a.txt"
+  data2: "/tmp/a"
+  data3: ".txt"
+  data4: "true"
+  data5: "false"
+```
+
+### kindOf，kindIs,deepEqual
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  data1: {{ kindOf (list 1 2 3 ) | quote }}
+  data2: {{ kindIs "string" "haha" | quote }}
+  data3: {{ deepEqual (list 1 2 3 ) (list 1 2 3 ) | quote }}
+  data4: {{ deepEqual (list 1 2 3 ) (list 2 3 4 ) | quote }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  data1: "slice"
+  data2: "true"
+  data3: "true"
+  data4: "false"
+```
 
 # 流程控制语句
 
 ## if/else 
 
+条件判断
+
+案例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{- if ge (.Values.Person.age | int ) 18  }}
+  result: "成年"
+  {{- else }}
+  result: "未成年"
+  {{- end }}
+```
+
+结果:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  result: "成年"
+```
+
 ## with 
+
+控制变量的范围
+
+案例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{- with .Values.people.info }}
+  name: {{ .name | quote }}
+  age: {{ .age | quote }}
+  desc: {{ .desc | quote }}
+  {{- end }}
+```
+
+结果:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  name: "mary"
+  age: "19"
+  desc: "haha"
+```
+
+
 
 ## range
 
+遍历集合输出
+
+案例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  {{ range .Values.address }}
+  {{- . | title }}
+  {{ end }}
+```
+
+结果:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  Beijing
+  Shanghai
+  Xian
+```
+
 # helm3中变量详解
 
-## 声明变量的格式和作用
+## 作用域
+
+### 声明变量的格式和作用
 
 变量通常是搭配with语句和range语句使用，这样能有效的简化代码，变量的定义格式如下: 
 
@@ -892,45 +1610,194 @@ $name:=value
 
 因为with语句里不能调用父级别的变量，所以如果需要调用父级别的变量，需要声明一个变量名，将父级别的变量值赋值给声明的变量在前面关于helm流控制结构的文章中提到过使用with更改当前作用域的用法，当时存在一个问题是在with语句中，无法使用父作用域中的对象，需要使用 $符号或者将语句移到{{- end }}的外面才可以。现在使用变量也可以解决这个问题。示例:
 
-values.yaml
-
-```yaml
-people:
-	info:
-		name: test
-		age: 18
-		sex: boy
-```
-
-xxx.yaml
+示例：
 
 ```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-	name: {{ .Release.Name }}-configmap
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
 data:
-	{{ -$releaseName := .Release.Name }}
-	{{ -with .Values.people.info }}
-	name: {{ .name }}
-	age: {f .age }}
-	release3: {{ .Release.Name }}
+  {{- $releaseName := .Release.Name }}
+  {{- with .Values.people.info }}
+  name: {{ .name | quote }}
+  age: {{ .age | quote }}
+  release: {{ $releaseName | quote }}
+  {{- end }}
 ```
 
+结果：
 
-
-
-## 作用域
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  name: "mary"
+  age: "19"
+  release: "myconfigmap"
+```
 
 ## 列表或元组
 
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  address: |-
+    {{- range $index, $val := .Values.address }}
+    {{ $index}}: {{ $val }}
+    {{- end }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  address: |-
+    0: beijing
+    1: shanghai
+    2: xian
+```
+
 ## 字典
+
+示例：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+data:
+  address: |-
+    {{- range $key, $val := .Values.people.info }}
+    {{ $key }}: {{ $val }}
+    {{- end }}
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+data:
+  address: |-
+    age: 19
+    desc: haha
+    name: mary
+```
 
 # helm3中子模板定义和使用
 
 ## define
 
-## template
+### 定义位置
+
+- 主模板
+- _helpers.tpl
+
+1. 使用define在主模板中定义子模板的，使用template进行调用子模板
+2. 使用define在helpers.tpl文件中定义子模板，使用template进行调用子模板
+3. 向子模板中传入对象、使用template进行调用子模板
+4. 向子模板中传入对象，使用include进行调用子模板
+
+_helpers.tpl
+
+```yaml
+{{- define "mychart.labels" -}}
+  labels:
+    author: test
+    date: {{ now | htmlDate }}
+{{- end -}}
+```
+
+configmap.yaml
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+  {{ template "mychart.labels" }}
+data:
+  data1: "hello"
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+  labels:
+    author: test
+    date: 2025-04-21
+data:
+  data1: "hello "
+```
+
+## 
+
+_helpers.tpl
+
+```yaml
+{{- define "mychart.labels" -}}
+  labels:
+    author: test
+    name: {{ .people.info.name}}
+{{- end -}}
+```
+
+configmap.yaml
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace}}
+  {{ template "mychart.labels" .Values }}
+data:
+  data1: "hello"
+```
+
+结果：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap-configmap
+  namespace: default
+  labels:
+    author: test
+    name: mary
+data:
+  data1: "hello"
+```
+
+## 
 
 ## include
 
